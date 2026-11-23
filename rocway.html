@@ -1352,6 +1352,15 @@ textarea{resize:none}
 .rpk{position:relative}
 .rpin{position:absolute;left:-18px;top:-45px;width:36px;height:46px;filter:drop-shadow(0 3px 4px rgba(0,0,0,.35));animation:pindrop .45s cubic-bezier(.3,1.6,.5,1)}
 @keyframes pindrop{from{transform:translateY(-18px);opacity:0}to{transform:none;opacity:1}}
+/* ===== Expandable maps ===== */
+.mapexp{position:absolute;top:10px;right:10px;z-index:6;width:38px;height:38px;border-radius:12px;border:0;background:var(--surface);color:var(--text);display:grid;place-items:center;cursor:pointer;box-shadow:0 4px 14px rgba(15,23,42,.18)}
+.mapexp:hover{background:var(--surface2)}
+.mapexp:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.mapexp svg{width:20px;height:20px}
+.view.mapfull{overflow:hidden}
+.minimap.full{position:absolute;inset:0;height:auto;z-index:25;border-radius:0;border:0;box-shadow:none}
+.minimap.full .mapexp{top:14px;right:14px}
+.minimap.full .nbctl{right:14px;bottom:18px}
 </style>
 </head>
 <body>
@@ -1465,7 +1474,7 @@ const P = {
   bellOn:'<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.6 2H4.4Z"/><path d="M10 21a2.1 2.1 0 0 0 4 0"/><path d="M2.5 9a9 9 0 0 1 2.4-5M21.5 9a9 9 0 0 0-2.4-5"/>',
   chevD:'<path d="m6 9 6 6 6-6"/>', chevR:'<path d="m9 6 6 6-6 6"/>', chevL:'<path d="m15 5-7 7 7 7"/>',
   calendar:'<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17"/><path d="M8 3v4"/><path d="M16 3v4"/><rect x="13.5" y="13.5" width="3.5" height="3.5" rx=".6" fill="currentColor" stroke="none"/>',
-  first:'<path d="M6 5v14"/><path d="m17 6-6 6 6 6"/>', arrowL:'<path d="M19 12H5"/><path d="m11 18-6-6 6-6"/>', copy:'<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/>', last:'<path d="M18 5v14"/><path d="m7 6 6 6-6 6"/>',
+  first:'<path d="M6 5v14"/><path d="m17 6-6 6 6 6"/>', expand:'<path d="M14 4h6v6"/><path d="M20 4l-7 7"/><path d="M10 20H4v-6"/><path d="M4 20l7-7"/>', collapse:'<path d="M20 4l-6 6"/><path d="M14 4v6h6"/><path d="M4 20l6-6"/><path d="M10 20v-6H4"/>', arrowL:'<path d="M19 12H5"/><path d="m11 18-6-6 6-6"/>', copy:'<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/>', last:'<path d="M18 5v14"/><path d="m7 6 6 6-6 6"/>',
   x:'<path d="M6 6l12 12M18 6 6 18"/>', check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>', plus:'<path d="M12 5v14M5 12h14"/>', minus:'<path d="M5 12h14"/>',
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4"/>',
   moon:'<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/>',
@@ -1866,7 +1875,7 @@ const TITLES = {home:'',trip:'Trip Planner',routes:'Routes',nearby:'Nearby Stops
 const TABS = [['trip','Trip','trip'],['routes','Routes','bus'],['nearby','Nearby','pin'],['wallet','Wallet','wallet']];
 const PAGES = {editProfile:'Edit Profile',changePassword:'Change Password',payment:'Payment Methods',myProfile:'My Profile',region:'Region',terms:'Terms of Service',privacy:'Privacy Policy',attributions:'Attributions'};
 const cur = () => S.stack.length ? S.stack[S.stack.length-1] : S.tab;
-function show(anim){
+function show(anim){ S.mapFull = null; requestAnimationFrame(mapFullSync);
   const v = cur();
   document.querySelectorAll('#views .view').forEach(s => s.classList.toggle('on', s.id === 'v-'+v));
   const el = $('#v-'+v); if (anim){ el.classList.remove('anim'); void el.offsetWidth; el.classList.add('anim'); }
@@ -2173,7 +2182,7 @@ function renderTrip(){
       <button class="mini" data-a="rmStop" data-i="${i}" aria-label="Remove stop ${i+1}">${I('x')}</button></div>`; });
   rows += line + `<div class="tf-row" style="margin-top:-14px"><span class="tf-ic">${I('pin')}</span>${field('toIn', S.to, 'Search a place or address', 'To')}</div>`;
   const vt = $('#v-trip');
-  if (!vt.dataset.built){ vt.dataset.built = 1; vt.innerHTML = `<div class="pad tpmapwrap"><div class="minimap nbmap"><div class="mapwrap" id="tpMap"></div><div class="nbctl"><button data-a="mapZoom" data-m="tp" data-d="1" aria-label="Zoom in">${I('plus')}</button><button data-a="mapZoom" data-m="tp" data-d="-1" aria-label="Zoom out">${I('minus')}</button><button data-a="tpRecenter" aria-label="Show the whole trip">${I('nav')}</button></div></div></div><div id="tripBody"></div>`; }
+  if (!vt.dataset.built){ vt.dataset.built = 1; vt.innerHTML = `<div class="pad tpmapwrap"><div class="minimap nbmap"><div class="mapwrap" id="tpMap"></div><button class="mapexp" data-a="mapExpand" data-m="tp" aria-label="Expand map" aria-pressed="false">${I('expand')}</button><div class="nbctl"><button data-a="mapZoom" data-m="tp" data-d="1" aria-label="Zoom in">${I('plus')}</button><button data-a="mapZoom" data-m="tp" data-d="-1" aria-label="Zoom out">${I('minus')}</button><button data-a="tpRecenter" aria-label="Show the whole trip">${I('nav')}</button></div></div></div><div id="tripBody"></div>`; }
   $('#tripBody').innerHTML = `
    <div class="card tripform">
      <div style="display:flex;gap:6px;align-items:center"><div class="seg sm" style="flex:1;min-width:0" role="tablist" aria-label="Trip type">${[['one','One-way'],['round','Round trip'],['multi','Multi-stop']].map(([k,l]) => `<button role="tab" aria-selected="${S.tt===k}" class="${S.tt===k?'on':''}" data-a="tripType" data-k="${k}">${l}</button>`).join('')}</div>
@@ -2259,6 +2268,19 @@ function openDD(k, keep){
 }
 function closeDD(){ S.ddOpen = null; document.querySelectorAll('.ddpanel').forEach(p => p.classList.remove('on')); document.querySelectorAll('.dd.open').forEach(b => b.classList.remove('open')); }
 
+/* ---------- Expand a map to fill the screen (Trip Planner, Trip Details, Route, Nearby) ---------- */
+const MAP_EL = {tp:'tpMap', td:'tdMap', rd:'rdMap', nb:'nbMap'};
+function mapFullSync(){
+  document.querySelectorAll('.view.mapfull').forEach(v => v.classList.remove('mapfull'));
+  document.querySelectorAll('.minimap.full').forEach(c => c.classList.remove('full'));
+  document.querySelectorAll('.mapexp').forEach(b => { b.innerHTML = I('expand'); b.setAttribute('aria-label','Expand map'); b.setAttribute('aria-pressed','false'); });
+  const m = S.mapFull, wrap = m && document.getElementById(MAP_EL[m]), card = wrap && wrap.closest('.minimap'), view = card && card.closest('.view');
+  if (!card || !view.classList.contains('on')){ S.mapFull = null; Object.values(MAPS).forEach(x => x && x.map.invalidateSize(false)); return; }
+  view.scrollTop = 0; view.classList.add('mapfull'); card.classList.add('full');
+  const b = card.querySelector('.mapexp'); b.innerHTML = I('collapse'); b.setAttribute('aria-label','Shrink map'); b.setAttribute('aria-pressed','true');
+  setTimeout(() => MAPS[m] && MAPS[m].map.invalidateSize(true), 30);
+}
+addEventListener('keydown', e => { if (e.key==='Escape' && S.mapFull && !document.querySelector('#sheetwrap.on')){ S.mapFull = null; mapFullSync(); } });
 /* ---------- Line header bar (Trip Details + Route pages) ---------- */
 function lineBar(n){ const r = R(n); if (!r) return ''; const east = r.side==='east';
   return `<div class="rhead ${east?'east':''}" style="--rc:${east?'var(--route-east)':'var(--route-west)'}">
@@ -2279,7 +2301,7 @@ function renderTripDetail(){
   const on = S.tripBells.has(r.key), sv = S.saved.has(r.key);
   const nightOn = S.F.night.length, accOn = S.F.access.length, wxOn = S.F.weather.length;
   const busLeg = r.segs[0].legs.find(l => l.m==='bus');
-  $('#v-tripDetail').innerHTML = `${busLeg ? lineBar(busLeg.r) : ''}<div class="pad" style="padding-bottom:0"><div class="minimap nbmap"><div class="mapwrap" id="tdMap"></div><div class="nbctl"><button data-a="mapZoom" data-m="td" data-d="1" aria-label="Zoom in">${I('plus')}</button><button data-a="mapZoom" data-m="td" data-d="-1" aria-label="Zoom out">${I('minus')}</button><button data-a="tdRecenter" aria-label="Show the whole trip">${I('nav')}</button></div></div></div>
+  $('#v-tripDetail').innerHTML = `${busLeg ? lineBar(busLeg.r) : ''}<div class="pad" style="padding-bottom:0"><div class="minimap nbmap"><div class="mapwrap" id="tdMap"></div><button class="mapexp" data-a="mapExpand" data-m="td" aria-label="Expand map" aria-pressed="false">${I('expand')}</button><div class="nbctl"><button data-a="mapZoom" data-m="td" data-d="1" aria-label="Zoom in">${I('plus')}</button><button data-a="mapZoom" data-m="td" data-d="-1" aria-label="Zoom out">${I('minus')}</button><button data-a="tdRecenter" aria-label="Show the whole trip">${I('nav')}</button></div></div></div>
    <div class="pad stack">
     <div class="card"><div id="tdSum">${tdSumHTML(r, isLive)}</div>
       <div class="row" style="margin-top:12px;gap:8px">
@@ -2293,7 +2315,7 @@ function renderTripDetail(){
    </div>
    <div class="stickybar">${r.id==='d'?`<button class="btn btn-primary full" data-a="toastMsg" data-m="Opening your rideshare app…">${I('car')}Request ride · ${r.costT}</button>`:r.id==='e'?`<button class="btn btn-primary full" data-a="toastMsg" data-m="Bike unlocked at the Lot D dock">${I('bike')}Unlock bike · ${r.costT}</button>`:`<button class="btn btn-primary full" data-a="buy">${I('ticket')}Purchase Ticket${S.F.pax>1?'s':''} · ${r.costT}</button>`}</div>`;
   requestAnimationFrame(() => { const {map, overlay} = makeMap('td', $('#tdMap'), true); addUser(overlay); S.tdPts = drawTrip(overlay, r.pts).concat([USER]); fitTo(map, S.tdPts); });
-  tdCenter(false);
+  tdCenter(false); requestAnimationFrame(mapFullSync);
 }
 /* ----- Trip detail schedule (TripShot-style time wheel) ----- */
 const dayStart = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -2475,7 +2497,7 @@ function rdRefresh(smooth){ const n = S.curRoute, old = $('#rdScroll'), keep = o
   $('#rdSum').innerHTML = rdSumHTML(n); $('#rdCard').innerHTML = rdCardHTML(n); rdCenter(smooth, smooth ? keep : null); }
 function renderRouteDetail(){
   const r = R(S.curRoute), east = r.side==='east', on = S.routeBells.has(r.n), fv = S.favRoutes.has(r.n);
-  $('#v-routeDetail').innerHTML = `${lineBar(r.n)}<div class="pad" style="padding-bottom:0"><div class="minimap nbmap"><div class="mapwrap" id="rdMap"></div><div class="nbctl"><button data-a="mapZoom" data-m="rd" data-d="1" aria-label="Zoom in">${I('plus')}</button><button data-a="mapZoom" data-m="rd" data-d="-1" aria-label="Zoom out">${I('minus')}</button><button data-a="rdRecenter" aria-label="Show the whole route and your location">${I('nav')}</button></div></div></div>
+  $('#v-routeDetail').innerHTML = `${lineBar(r.n)}<div class="pad" style="padding-bottom:0"><div class="minimap nbmap"><div class="mapwrap" id="rdMap"></div><button class="mapexp" data-a="mapExpand" data-m="rd" aria-label="Expand map" aria-pressed="false">${I('expand')}</button><div class="nbctl"><button data-a="mapZoom" data-m="rd" data-d="1" aria-label="Zoom in">${I('plus')}</button><button data-a="mapZoom" data-m="rd" data-d="-1" aria-label="Zoom out">${I('minus')}</button><button data-a="rdRecenter" aria-label="Show the whole route and your location">${I('nav')}</button></div></div></div>
    <div class="pad stack">
     <div class="card"><div id="rdSum">${rdSumHTML(r.n)}</div>
       <div class="row" style="margin-top:12px;gap:8px">
@@ -2488,13 +2510,13 @@ function renderRouteDetail(){
   requestAnimationFrame(() => { const {map, overlay} = makeMap('rd', $('#rdMap'), true); const pts = (east ? ['RIT Gleason Circle','Marketplace Mall','University of Rochester','RTS Transit Center, 60 St Paul St'] : ['RIT Gleason Circle','Park Point at RIT','Marketplace Mall','Wegmans · Calkins Rd']).map(xy);
     L.polyline(pts, {color:'#ffffff', weight:9, opacity:.9, interactive:false}).addTo(overlay);
     L.polyline(pts, {color:cssv(east?'--route-east':'--route-west'), weight:5, dashArray:'1 11', lineCap:'round', interactive:false}).addTo(overlay); pts.forEach((p,i) => L.marker(p, {icon:numIcon(i+1, east?'east':''), interactive:false}).addTo(overlay)); addUser(overlay); S.rdPts = pts.concat([USER]); fitTo(map, S.rdPts); });
-  rdCenter(false);
+  rdCenter(false); requestAnimationFrame(mapFullSync);
 }
 
 /* ---------- Nearby ---------- */
 function renderNearby(){
   const v = $('#v-nearby');
-  if (!v.dataset.built){ v.dataset.built = 1; v.innerHTML = `<div class="pad" style="padding-bottom:0"><div class="minimap nbmap"><div class="mapwrap" id="nbMap"></div><div class="nbctl"><button data-a="mapZoom" data-m="nb" data-d="1" aria-label="Zoom in">${I('plus')}</button><button data-a="mapZoom" data-m="nb" data-d="-1" aria-label="Zoom out">${I('minus')}</button><button data-a="nbRecenter" aria-label="Show all nearby stops">${I('nav')}</button></div></div></div><div id="nbBody"></div>`; }
+  if (!v.dataset.built){ v.dataset.built = 1; v.innerHTML = `<div class="pad" style="padding-bottom:0"><div class="minimap nbmap"><div class="mapwrap" id="nbMap"></div><button class="mapexp" data-a="mapExpand" data-m="nb" aria-label="Expand map" aria-pressed="false">${I('expand')}</button><div class="nbctl"><button data-a="mapZoom" data-m="nb" data-d="1" aria-label="Zoom in">${I('plus')}</button><button data-a="mapZoom" data-m="nb" data-d="-1" aria-label="Zoom out">${I('minus')}</button><button data-a="nbRecenter" aria-label="Show all nearby stops">${I('nav')}</button></div></div></div><div id="nbBody"></div>`; }
   $('#nbBody').innerHTML = `<div class="pad stack">
     <div class="row between"><span class="small muted">3 stops near Golisano Hall</span><span class="live">Live arrivals</span></div>
     ${STOPS.map((s,i) => { const on = S.stopBells.has(s.id), al = S.alerted.has(s.id);
@@ -2744,6 +2766,7 @@ const A = {
     if (had.length){ had.forEach(x => S.saved.delete(x.key)); toast('Removed from saved trips','info'); renderTrip(); return; }
     const best = buildResults()[0] || all[0]; if (!best) return; A.saveTrip({dataset:{key:best.key}}, {stopPropagation(){}}); },
   tpRecenter:()=>{ if (MAPS.tp && S.tpPts) MAPS.tp.map.flyToBounds(L.latLngBounds(S.tpPts), {padding:[28,28], maxZoom:16, duration:.6}); },
+  mapExpand:(e)=>{ const m = e.dataset.m, was = S.mapFull; S.mapFull = was===m ? null : m; mapFullSync(); if (was===m) setTimeout(() => MAPS[m] && MAPS[m].map.invalidateSize(true), 40); },
   mapZoom:(e)=>{ const m = MAPS[e.dataset.m]; if (m) +e.dataset.d > 0 ? m.map.zoomIn(1) : m.map.zoomOut(1); },
   tdRecenter:()=>{ if (MAPS.td && S.tdPts) MAPS.td.map.flyToBounds(L.latLngBounds(S.tdPts), {padding:[28,28], maxZoom:16, duration:.6}); },
   tdTime:(e)=>{ S.td.sel = +e.dataset.t; tdRefresh(true); },
